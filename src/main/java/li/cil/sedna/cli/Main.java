@@ -33,12 +33,9 @@ public final class Main {
         final boolean enableGdbStub = argList.contains("-s");
         final boolean waitForGdb = argList.contains("-S");
         final boolean runBenchmark = argList.contains("--benchmark");
-        final boolean terminalMode = argList.contains("--terminal");
 
         if (runBenchmark) {
             runBenchmark();
-        } else if (terminalMode) {
-            runTerminal(enableGdbStub, waitForGdb);
         } else {
             runSimple(enableGdbStub, waitForGdb);
         }
@@ -104,93 +101,6 @@ public final class Main {
 
                     while (br.ready() && uart.canPutByte()) {
                         uart.putByte((byte) br.read());
-                    }
-                }
-
-                if (board.isRestarting()) {
-                    loadProgramFile(memory, images.firmware());
-                    loadProgramFile(memory, images.kernel(), 0x200000);
-
-                    board.initialize();
-                }
-
-                final long stepDuration = System.currentTimeMillis() - stepStart;
-                final long sleep = 1000 - stepDuration;
-                if (sleep > 0) {
-                    //noinspection BusyWait
-                    Thread.sleep(sleep);
-                }
-            }
-        }
-    }
-
-    private static void runTerminal(final boolean enableGdbStub, final boolean waitForGdb) throws Exception {
-        try (final Terminal terminal = TerminalBuilder.builder().jansi(false).jna(true).build()) {
-            if (terminal.getClass() == DumbTerminal.class) {
-                runSimple(enableGdbStub, waitForGdb);
-                return;
-            }
-
-            final NonBlockingReader reader = terminal.reader();
-            final PrintWriter writer = terminal.writer();
-
-            if (!terminal.getSize().equals(new Size(80, 25))) {
-                try {
-                    terminal.setSize(new Size(80, 25));
-                } catch (final UnsupportedOperationException e) {
-                    System.err.println("Cannot resize window to 80x25. Things might look a bit derpy.");
-                }
-            }
-
-            final Images images = getImages();
-
-            final R5Board board = new R5Board();
-            final PhysicalMemory memory = Memory.create(20 * 1024 * 1024);
-            final UART16550A uart = new UART16550A();
-            final GoldfishRTC rtc = new GoldfishRTC(SystemTimeRealTimeCounter.get());
-            final VirtIOBlockDevice hdd = new VirtIOBlockDevice(board.getMemoryMap(),
-                    ByteBufferBlockDevice.createFromStream(images.rootfs(), true));
-
-            uart.getInterrupt().set(0xA, board.getInterruptController());
-            rtc.getInterrupt().set(0xB, board.getInterruptController());
-            hdd.getInterrupt().set(0x1, board.getInterruptController());
-
-            board.addDevice(0x80000000L, memory);
-            board.addDevice(uart);
-            board.addDevice(rtc);
-            board.addDevice(hdd);
-
-            board.setBootArguments("root=/dev/vda ro");
-            board.setStandardOutputDevice(uart);
-
-            board.reset();
-
-            loadProgramFile(memory, images.firmware());
-            loadProgramFile(memory, images.kernel(), 0x200000);
-
-            board.initialize();
-            board.setRunning(true);
-
-            final int cyclesPerSecond = board.getCpu().getFrequency();
-            final int cyclesPerStep = 1_000;
-
-            int remaining = 0;
-            while (board.isRunning()) {
-                final long stepStart = System.currentTimeMillis();
-
-                remaining += cyclesPerSecond;
-                while (remaining > 0) {
-                    board.step(cyclesPerStep);
-                    remaining -= cyclesPerStep;
-
-                    int value;
-                    while ((value = uart.read()) != -1) {
-                        writer.append((char) value);
-                    }
-                    writer.flush();
-
-                    while (reader.available() > 0 && uart.canPutByte()) {
-                        uart.putByte((byte) reader.read());
                     }
                 }
 
