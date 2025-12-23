@@ -35,7 +35,7 @@ java.toolchain {
 
 repositories {
     mavenCentral()
-    ["fnuecke/sedna", "fnuecke/buildroot", "fnuecke/ceres"].forEach(repo -> {
+    ["North-Western-Development/sedna", "North-Western-Development/minux", "fnuecke/ceres"].forEach(repo -> {
         maven {
             url = uri("https://maven.pkg.github.com/${repo}")
             credentials {
@@ -64,8 +64,8 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.9.0'
 
     implementation tryProject(':modules:ceres', 'li.cil.ceres:ceres:0.0.4')
-    implementation tryProject(':modules:sedna', 'li.cil.sedna:sedna:2.0.7')
-    implementation tryProject(':modules:sedna-buildroot', 'li.cil.sedna:sedna-buildroot:0.0.8')
+    implementation tryProject(':modules:sedna', 'li.cil.sedna:sedna:2.0.13')
+    implementation tryProject(':modules:sedna-buildroot', 'li.cil.sedna:sedna-buildroot:0.0.64')
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
