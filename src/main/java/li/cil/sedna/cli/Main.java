@@ -168,6 +168,10 @@ public final class Main {
 					Thread.sleep(sleep);
 				}
 			}
+
+		// UnMount adapter devices.
+		vmAdapter.unmountDevices();
+		rpcAdapter.unmountDevices();
 		}
 	}
 
