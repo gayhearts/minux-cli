@@ -58,16 +58,29 @@ public final class Main {
     private static void runSimple(final boolean enableGdbStub, final boolean waitForGdb) throws Exception {
         final R5Board board = new R5Board();
         final PhysicalMemory memory = Memory.create(32 * 1024 * 1024);
-        //final UART16550A uart = new UART16550A();
         final GoldfishRTC rtc = new GoldfishRTC(SystemTimeRealTimeCounter.get());
 
 		final GlobalVMContext context = new GlobalVMContext(board);
 		final BuiltinDevices builtinDevices;
-	   	builtinDevices = new BuiltinDevices(context);
+
+        // grab minux images
+        final Images images = getImages();
+
+        // mount bootfs for first block device (vda)
+        //   can we add this to context?
+        final BlockDevice bootfs = ByteBufferBlockDevice.createFromStream(images.bootfs(), true);
+        final VirtIOBlockDevice vda = new VirtIOBlockDevice(board.getMemoryMap(), bootfs);
+        vda.getInterrupt().set(0x1, board.getInterruptController());
+		board.addDevice(vda);
+
+        // builtin device initialization. adds rootfs
+        builtinDevices = new BuiltinDevices(context);
+
+        // device adapters
 		final RPCDeviceBusAdapter rpcAdapter = new RPCDeviceBusAdapter(builtinDevices.rpcSerialDevice);
 		final VMDeviceBusAdapter vmAdapter;
-	   	vmAdapter = new VMDeviceBusAdapter(context);
-	
+		vmAdapter = new VMDeviceBusAdapter(context);
+
 		// terminal signals
 		SignalHandler handler = new SignalHandler () {
 			// ^C
@@ -79,22 +92,13 @@ public final class Main {
 		Signal.handle(new Signal("INT"), handler);
 
 
-        final Images images = getImages();
-
-        final BlockDevice rootfs = ByteBufferBlockDevice.createFromStream(images.rootfs(), false);
-        final VirtIOBlockDevice hdd = new VirtIOBlockDevice(board.getMemoryMap(), rootfs);
-        final VirtIOFileSystemDevice fs = new VirtIOFileSystemDevice(board.getMemoryMap(), "host_fs", new HostFileSystem());
-
         builtinDevices.uart.getInterrupt().set(0xA, board.getInterruptController());
         rtc.getInterrupt().set(0xB, board.getInterruptController());
-        hdd.getInterrupt().set(0x1, board.getInterruptController());
-        fs.getInterrupt().set(0x2, board.getInterruptController());
+
 
         board.addDevice(0x80000000L, memory);
         board.addDevice(builtinDevices.uart);
         board.addDevice(rtc);
-        board.addDevice(hdd);
-        board.addDevice(fs);
 
 		board.getCpu().setFrequency(25_000_000);
         board.setBootArguments("root=/dev/vda rw");
@@ -102,10 +106,16 @@ public final class Main {
 
         board.reset();
 
+        // Add device firmware.
         loadProgramFile(memory, images.firmware());
         loadProgramFile(memory, images.kernel(), 0x200000);
 
         board.initialize();
+
+        // Mount adapter devices.
+        vmAdapter.mountDevices();
+        rpcAdapter.mountDevices();
+
         board.setRunning(true);
 
         if (enableGdbStub) {
@@ -125,6 +135,7 @@ public final class Main {
                 remaining += cyclesPerSecond;
                 while (remaining > 0) {
                     board.step(cyclesPerStep);
+                    rpcAdapter.step(cyclesPerStep);
                     remaining -= cyclesPerStep;
 
                     int value;
@@ -170,8 +181,8 @@ public final class Main {
         return new Images(
                 Buildroot.getFirmware(),
                 Buildroot.getLinuxImage(),
+                Buildroot.getBootFilesystem(),
                 Buildroot.getRootFilesystem());
     }
 
-    private record Images(InputStream firmware, InputStream kernel, InputStream rootfs) { }
-}
+    private record Images(InputStream firmware, InputStream kernel, InputStream bootfs, InputStream rootfs) { } }
