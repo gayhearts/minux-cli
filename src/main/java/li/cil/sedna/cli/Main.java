@@ -45,6 +45,11 @@ import java.util.Arrays;
 import java.util.List;
 
 public final class Main {
+	public static int VM_MEMORY_MEGABYTES = 32;
+	public static int VM_MEMORY_BYTES = (VM_MEMORY_MEGABYTES * 1024 * 1024);
+
+	public static int VM_CPU_FREQUENCY = 25_000_000;
+
 	public static void main(final String[] args) throws Exception {
 		Sedna.initialize();
 
@@ -57,7 +62,7 @@ public final class Main {
 
 	private static void runSimple(final boolean enableGdbStub, final boolean waitForGdb) throws Exception {
 		final R5Board board = new R5Board();
-		final PhysicalMemory memory = Memory.create(32 * 1024 * 1024);
+		final PhysicalMemory memory = Memory.create(VM_MEMORY_BYTES);
 		final GoldfishRTC rtc = new GoldfishRTC(SystemTimeRealTimeCounter.get());
 
 		final GlobalVMContext context = new GlobalVMContext(board);
@@ -100,7 +105,7 @@ public final class Main {
 		board.addDevice(builtinDevices.uart);
 		board.addDevice(rtc);
 
-		board.getCpu().setFrequency(25_000_000);
+		board.getCpu().setFrequency(VM_CPU_FREQUENCY);
 		board.setBootArguments("root=/dev/vda rw");
 		board.setStandardOutputDevice(builtinDevices.uart);
 
