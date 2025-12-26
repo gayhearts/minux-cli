@@ -1,15 +1,19 @@
 #!/usr/bin/env sh
 
 set -o posix
-set -o posixly-correct 2>/dev/null
+
+## if using yash, uncomment to make more posix. 
+#set -o posixly-correct
 
 IsTrapped() {
 	if( test $# -ne 4 ); then
 		return 3
 	else
-		if( test "$3" == "true" ); then
+		signal_value=$(echo "$3" | tr -d \')
+
+		if( test "$signal_value" == "true" ); then
 			return 0 #true
-		elif( test "$3" == "-" ); then
+		elif( test "$signal_value" == "-" ); then
 			return 1 #false
 		else
 			return 4 #unknown
